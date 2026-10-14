@@ -18,12 +18,22 @@ export class ConfiguredOtpDelivery implements OtpDelivery {
       await this.transporter.sendMail({ from: env.SMTP_FROM, to: destination, subject: "رمز التحقق", text: `رمز التحقق الخاص بك: ${code}. تنتهي صلاحيته خلال 5 دقائق.` });
       return;
     }
-    const response = await fetch(env.SMS_GATEWAY_URL, {
-      method: "POST",
-      headers: { authorization: `Bearer ${env.SMS_GATEWAY_TOKEN}`, "content-type": "application/json" },
-      body: JSON.stringify({ to: destination, message: `رمز التحقق: ${code}. صالح لمدة 5 دقائق.` }),
-      signal: AbortSignal.timeout(8_000),
-    });
+    if (!env.SMS_GATEWAY_URL || !env.SMS_GATEWAY_TOKEN) {
+  throw new Error("SMS delivery is not configured");
+}
+
+const response = await fetch(env.SMS_GATEWAY_URL, {
+  method: "POST",
+  headers: {
+    authorization: `Bearer ${env.SMS_GATEWAY_TOKEN}`,
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    to: destination,
+    message: `رمز التحقق: ${code}. صالح لمدة 5 دقائق.`,
+  }),
+  signal: AbortSignal.timeout(8_000),
+});
     if (!response.ok) throw new Error(`SMS gateway rejected request (${response.status})`);
   }
 }
