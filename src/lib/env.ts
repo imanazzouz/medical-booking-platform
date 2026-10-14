@@ -13,7 +13,9 @@ const envSchema = z.object({
   FIELD_ENCRYPTION_KEY: z.string().min(40), // Legacy v1 key; retain until all v1 data has been rewrapped.
   FIELD_ENCRYPTION_KEYS_JSON: z.string().optional(), // Versioned base64 32-byte keys from a secret manager.
   FIELD_ENCRYPTION_ACTIVE_KEY_VERSION: z.string().regex(/^v[1-9][0-9]*$/).default("v1"),
-  REDIS_URL: z.string().url(),
+  REDIS_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().positive(),
   SMTP_USER: z.string().min(1),
@@ -25,6 +27,8 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().url().optional(),
 }).superRefine((value, ctx) => {
+  if (Boolean(value.UPSTASH_REDIS_REST_URL) !== Boolean(value.UPSTASH_REDIS_REST_TOKEN)) ctx.addIssue({ code: "custom", path: ["UPSTASH_REDIS_REST_TOKEN"], message: "Configure both Upstash REST URL and token together" });
+  if (!value.REDIS_URL && !(value.UPSTASH_REDIS_REST_URL && value.UPSTASH_REDIS_REST_TOKEN)) ctx.addIssue({ code: "custom", path: ["REDIS_URL"], message: "Configure REDIS_URL or both Upstash REST values" });
   if (value.ACCESS_TOKEN_SECRET === value.REFRESH_TOKEN_SECRET) ctx.addIssue({ code: "custom", path: ["REFRESH_TOKEN_SECRET"], message: "Access and refresh signing keys must differ" });
   const decodeKey = (encoded: string): Buffer | null => {
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return null;

@@ -12,6 +12,7 @@ if (mediaOrigin) {
 }
 
 const nextConfig = {
+  outputFileTracingRoot: process.cwd(),
   ...(process.env.VERCEL ? {} : { output: "standalone" }),
   poweredByHeader: false,
   reactStrictMode: true,
