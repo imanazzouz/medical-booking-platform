@@ -38,7 +38,7 @@
     "dotenv": "^16.4.7",
     "framer-motion": "^14.1.0",
     "ioredis": "^5.4.2",
-    "jose": "^5.9.6",
+    "jose": "^6.2.12",
     "logrocket": "^12.4.0",
     "lucide-react": "^1.55.0",
     "next": "^15.5.0",
