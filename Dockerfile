@@ -93,7 +93,7 @@ ENTRYPOINT ["./node_modules/.bin/prisma"]
 CMD ["migrate", "deploy"]
 
 # Backup sidecar. Encryption is client-side; object storage credentials are runtime-only.
-FROM alpine:3.22 AS backup
+FROM alpine:3.24 AS backup
 RUN apk add --no-cache age bash ca-certificates postgresql16-client rclone \
   && addgroup -S backup \
   && adduser -S -u 10001 -G backup backup
