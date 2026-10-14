@@ -1,0 +1,100 @@
+name: CI for Vercel deployment
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tibbi-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DATABASE_URL: postgresql://medical:ci-password@localhost:5432/medical_booking?schema=public
+  DATABASE_URL_UNPOOLED: postgresql://medical:ci-password@localhost:5432/medical_booking?schema=public
+  APP_ORIGIN: https://tibbi.example
+  ACCESS_TOKEN_SECRET: ci-only-access-secret-at-least-32-characters
+  REFRESH_TOKEN_SECRET: ci-only-refresh-secret-at-least-32-characters
+  OTP_PEPPER: ci-only-otp-secret-at-least-32-characters
+  LOOKUP_HMAC_SECRET: ci-only-lookup-secret-at-least-32-characters
+  CSRF_SECRET: ci-only-csrf-secret-at-least-32-characters
+  API_KEY_PEPPER: ci-only-api-key-secret-at-least-32-characters
+  FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  FIELD_ENCRYPTION_ACTIVE_KEY_VERSION: v1
+  REDIS_URL: redis://localhost:6379
+  SMTP_HOST: localhost
+  SMTP_PORT: "1025"
+  SMTP_USER: ci
+  SMTP_PASSWORD: ci-only
+  SMTP_FROM: no-reply@example.test
+  SMS_GATEWAY_URL: https://sms.example.test/send
+  SMS_GATEWAY_TOKEN: ci-only
+  NEXT_PUBLIC_SITE_URL: https://tibbi.example
+  NEXT_PUBLIC_DEPLOYMENT_ENV: ci
+  NEXT_PUBLIC_SEO_INDEXING_ENABLED: "false"
+  NEXT_PUBLIC_USE_MOCK_DATA: "true"
+  NEXT_PUBLIC_LOGROCKET_BAA_APPROVED: "false"
+  NEXT_PUBLIC_SENTRY_DSN: ""
+  SENTRY_DSN: ""
+
+jobs:
+  verify:
+    name: Quality, PostgreSQL migrations, and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: medical_booking
+          POSTGRES_USER: medical
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medical -d medical_booking"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate Prisma client and validate schema
+        run: |
+          npm run prisma:generate
+          npm run prisma:validate
+      - name: Apply all migrations to a fresh PostgreSQL instance
+        run: npx prisma migrate deploy
+      - name: Typecheck and lint
+        run: |
+          npm run typecheck
+          npm run lint
+      - name: Unit and integration tests
+        run: npm test -- --reporter=dot
+      - name: Bundle background workers
+        run: npm run bundle:workers
+      - name: Verify production build
+        run: npm run build
+      - name: Block on critical advisories across all dependencies
+        run: npm audit --audit-level=critical
+      - name: Block on high or critical production dependency advisories
+        run: npm audit --omit=dev --audit-level=high

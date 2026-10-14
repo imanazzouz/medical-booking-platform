@@ -1,0 +1,148 @@
+name: tibbi-production
+services:
+  proxy:
+    image: caddy:2.10-alpine
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST in the environment file}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in the environment file}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  app:
+    image: ${APP_IMAGE:?Set APP_IMAGE to a published immutable image tag}
+    env_file:
+      - ../.env.production
+    environment:
+      NODE_ENV: production
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:?Set staging or production}
+      APP_ORIGIN: ${APP_ORIGIN:?Set the exact HTTPS origin}
+      NEXT_PUBLIC_USE_MOCK_DATA: "false"
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    expose:
+      - "3000"
+    volumes:
+      - next_cache:/app/.next/cache
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    read_only: true
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    image: ${MIGRATOR_IMAGE:?Set MIGRATOR_IMAGE to the matching migrator image tag}
+    env_file:
+      - ../.env.production
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set pooled DATABASE_URL}
+      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set direct DATABASE_URL_UNPOOLED for migrations}
+    profiles: ["migration"]
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+
+  notifications-worker:
+    image: ${APP_IMAGE:?Set APP_IMAGE}
+    env_file:
+      - ../.env.production
+    environment:
+      NODE_ENV: production
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:?Set staging or production}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
+      NEXT_PUBLIC_USE_MOCK_DATA: "false"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+    command: ["node", "dist/workers/notification-worker.js"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  booking-maintenance-worker:
+    image: ${APP_IMAGE:?Set APP_IMAGE}
+    env_file:
+      - ../.env.production
+    environment:
+      NODE_ENV: production
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:?Set staging or production}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
+      NEXT_PUBLIC_USE_MOCK_DATA: "false"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+    command: ["node", "dist/workers/booking-maintenance-worker.js"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  availability-worker:
+    image: ${APP_IMAGE:?Set APP_IMAGE}
+    env_file:
+      - ../.env.production
+    environment:
+      NODE_ENV: production
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:?Set staging or production}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
+      NEXT_PUBLIC_USE_MOCK_DATA: "false"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+    command: ["node", "dist/workers/availability-worker.js"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  backup:
+    image: ${BACKUP_IMAGE:?Set BACKUP_IMAGE to a published backup image tag}
+    env_file:
+      - ../.env.production
+    environment:
+      DATABASE_URL: ${DATABASE_URL_UNPOOLED:?Set direct DATABASE_URL_UNPOOLED for pg_dump}
+      BACKUP_REMOTE: ${BACKUP_REMOTE:?Set an isolated S3-compatible backup prefix}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/backup-last-success && find /tmp/backup-last-success -mmin -1500 -print -quit | grep -q ."]
+      interval: 15m
+      timeout: 5s
+      retries: 2
+      start_period: 26h
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caddy_data:
+  caddy_config:
+  next_cache:

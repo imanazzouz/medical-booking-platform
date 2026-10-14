@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 150 28% 98%;
+  --foreground: 198 32% 16%;
+  --card: 0 0% 100%;
+  --border: 155 20% 90%;
+  --muted: 155 20% 94%;
+  --primary: 176 73% 29%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 165 35% 94%;
+  --secondary-foreground: 175 65% 25%;
+  --accent: 17 73% 94%;
+  --accent-foreground: 16 60% 38%;
+  --font-app: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+.dark {
+  --background: 198 34% 9%;
+  --foreground: 155 24% 93%;
+  --card: 198 29% 13%;
+  --border: 195 20% 23%;
+  --muted: 198 24% 16%;
+  --primary: 170 62% 48%;
+  --primary-foreground: 198 45% 9%;
+  --secondary: 175 26% 19%;
+  --secondary-foreground: 163 55% 78%;
+  --accent: 15 28% 20%;
+  --accent-foreground: 18 75% 78%;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: var(--font-app); -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; }
+::selection { background: rgba(28, 153, 139, .2); }
+
+@layer components {
+  .container-shell { @apply mx-auto w-full max-w-[1240px] px-4 sm:px-6 lg:px-8; }
+  .eyebrow { @apply mb-3 inline-flex items-center gap-2 rounded-full border border-primary/10 bg-white/70 px-3 py-1.5 text-xs font-bold tracking-wide text-primary shadow-sm dark:bg-white/5; }
+  .section-title { @apply text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl; }
+  .section-subtitle { @apply mt-2 max-w-2xl text-sm leading-7 text-foreground/60 sm:text-base; }
+  .soft-card { @apply rounded-3xl border border-border/80 bg-card shadow-soft; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
